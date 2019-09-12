@@ -2,6 +2,7 @@ import json
 import os
 import requests
 import zipfile
+import io
 
 
 class Main:
@@ -22,15 +23,7 @@ class Main:
             print("Using online version provider")
             response = requests.get(self.version_provider)
             print(response)
-            self.downloadable_versions = response.json()
-
-    def _unpack(self, zipped):
-        with zipfile.ZipFile(zipped, "r") as zip:
-            print("Extracting...")
-            zip.extractall()
-
-        print("Removing zip file")
-        os.remove(zipped)
+            self.downloadable_versions = response.json().get("versions")
 
     def download_version(self, version):
         print(version)
@@ -44,13 +37,28 @@ class Main:
 
         else:
             print("Downloading from internet")
-            respones = requests.get(link)
-            open("update.zip", "wb").write(respones.content)
-            self._unpack("update.zip")
+            response = requests.get(link)
+            in_memory = io.BytesIO(response.content)
+            archive = zipfile.ZipFile(in_memory, "r")
+            print("Extracting...")
+            archive.extractall()
+
+        # update changes to self
+        app_main = self.downloadable_versions.get(version).get("main")
+        self.downloaded_versions.update({version: {"main": app_main}})
 
     def launch(self, version):
         run = self.downloaded_versions.get(version)
-        os.system("/" + version + run.get("main"))
+        os.system("python3 " + version + "/" + run.get("main"))
+
+    def update_state(self):
+        config = {
+            "version_provider": self.version_provider,
+            "downloaded_versions": self.downloaded_versions,
+            "use_version": self.use_version
+        }
+        with open("client.json", "w") as f:
+            f.write(json.dumps(config, indent=4))
 
     def main(self):
         print("Launcher started!")
@@ -102,13 +110,23 @@ class Main:
         else:
             if self.downloaded_versions:
                 if self.downloadable_versions:
-                    print("Using local version, internet is available")
-                    # use rather downloaded (preference) # LOCAL
-                    self.launch(self.use_version)
+                    if self.use_version in self.downloaded_versions: 
+                        print("Using local version, internet is available")
+                        # use rather downloaded (preference) # LOCAL
+                        self.launch(self.use_version)
+                    else:
+                        # DOWNLOAD
+                        print("Downloading specified version...")
+                        self.download_version(self.use_version)
+                        self.launch(self.use_version)
                 else:
-                    print("Using local version, internet is unavailable")
-                    self.launch(self.use_version)
-                    # use local # LOCAL
+                    if self.use_version in self.downloaded_versions:
+                        print("Using local version, internet is unavailable")
+                        self.launch(self.use_version)
+                        # use local # LOCAL
+                    else:
+                        # DONTLAUNCH
+                        print("Sorry, you need an internet connection :o")
             else:
                 if self.downloadable_versions:
                     print("Downloading version", self.use_version)
@@ -116,9 +134,11 @@ class Main:
                     self.launch(self.use_version)
                     # download nth online # DOWNLOAD
                 else:
+                    # DONTLAUNCH
                     print("Unable to launch", self.use_version,
                           "without internet connection")
-                    # DONTLAUNCH
+
+        self.update_state()
 
         # N-th launch, using version that is online - internet is required
 
