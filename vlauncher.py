@@ -49,7 +49,7 @@ class Main:
 
     def launch(self, version):
         run = self.downloaded_versions.get(version)
-        os.system("python3 " + version + "/" + run.get("main"))
+        os.system(version + "/" + run.get("main"))
 
     def update_state(self):
         config = {
