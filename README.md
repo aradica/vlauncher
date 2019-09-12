@@ -33,6 +33,9 @@ You can obtain a direct download link from Google Disk and use it to provide upd
     "downloaded_versions": {
         "1.0.0": {
             "main": "main.py"
+        },
+        "1.0.1": {
+            "main": "main.py"
         }
     },
     "use_version": "latest"
