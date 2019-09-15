@@ -14,42 +14,63 @@ class Main:
         self.downloaded_versions = downloaded_versions
         self.downloadable_versions = {}  # {version: download_link}
 
+        self.able_to_launch = True
+
     def get_downloadable_versions(self):
         if "https" not in self.version_provider[:5]:
             print("Using local version provider")
             with open(self.version_provider) as f:
                 self.downloadable_versions = json.load(f).get("versions")
         else:
-            print("Using online version provider")
-            response = requests.get(self.version_provider)
-            print(response)
-            self.downloadable_versions = response.json().get("versions")
+            print("Attempting to use online version provider")
+            try:
+                response = requests.get(self.version_provider)
+                print(response)
+                self.downloadable_versions = response.json().get("versions")
+            except Exception:
+                print("Failed to use online version provider")
+                self.downloadable_versions = None
 
     def download_version(self, version):
         print(version)
         link = self.downloadable_versions.get(version).get("download")
         print(link)
         if "https" not in link[:5]:
-            print("Downloading local version...")
-            with zipfile.ZipFile(link, "r") as zip:
-                print("Extracting...")
-                zip.extractall()  # path?
+            print("Attempting to download from local server...")
+            try:
+                with zipfile.ZipFile(link, "r") as zip:
+                    print("Extracting...")
+                    zip.extractall()  # path?
+            except Exception:
+                print("Failed to download local version!")
+                self.able_to_launch = False
 
         else:
-            print("Downloading from internet")
-            response = requests.get(link)
-            in_memory = io.BytesIO(response.content)
-            archive = zipfile.ZipFile(in_memory, "r")
-            print("Extracting...")
-            archive.extractall()
+            print("Attempting to downloading from internet")
+            try:
+                response = requests.get(link)
+                in_memory = io.BytesIO(response.content)
+                archive = zipfile.ZipFile(in_memory, "r")
+                print("Extracting...")
+                archive.extractall()
+            except Exception:
+                print("Failed to download from internet!")
+                self.able_to_launch = False
+                # TODO some fail protocol
 
         # update changes to self
         app_main = self.downloadable_versions.get(version).get("main")
         self.downloaded_versions.update({version: {"main": app_main}})
 
     def launch(self, version):
-        run = self.downloaded_versions.get(version)
-        os.system(version + "/" + run.get("main"))
+        self.update_state()
+        if self.able_to_launch:
+            run = self.downloaded_versions.get(version)
+            print("Launching", version, "with", run.get("main"))
+            os.chdir(version)
+            os.system(run.get("main"))
+        else:
+            print("Unable to launch!")
 
     def update_state(self):
         config = {
@@ -110,7 +131,7 @@ class Main:
         else:
             if self.downloaded_versions:
                 if self.downloadable_versions:
-                    if self.use_version in self.downloaded_versions: 
+                    if self.use_version in self.downloaded_versions:
                         print("Using local version, internet is available")
                         # use rather downloaded (preference) # LOCAL
                         self.launch(self.use_version)
@@ -127,6 +148,7 @@ class Main:
                     else:
                         # DONTLAUNCH
                         print("Sorry, you need an internet connection :o")
+                        self.update_state()
             else:
                 if self.downloadable_versions:
                     print("Downloading version", self.use_version)
@@ -138,7 +160,7 @@ class Main:
                     print("Unable to launch", self.use_version,
                           "without internet connection")
 
-        self.update_state()
+                    self.update_state()
 
         # N-th launch, using version that is online - internet is required
 
