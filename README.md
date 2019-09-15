@@ -11,11 +11,11 @@ Create a folder on Google Disk that will host your software releases. In the roo
 {
     "versions": {
         "1.0.0": {
-            "download": "<https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>">,
+            "download": "<https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>",
             "main": "python main.py"
         },
         "1.0.1": {
-            "download": "<https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>">,
+            "download": "<https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>",
             "main": "python main.py"
         }
     },
