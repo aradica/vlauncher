@@ -1,6 +1,6 @@
 # vlauncher
 
-Version manager &amp; launcher for critical systems.
+Version manager & launcher for critical systems.
 Part of a bigger project I have in mind that will enable anyone to use simple cloud hosting services as a platform to deliver software updates.
 
 ## How to use with Google Disk
@@ -11,14 +11,15 @@ Create a folder on Google Disk that will host your software releases. In the roo
 {
     "versions": {
         "1.0.0": {
-            "download": "https://drive.google.com/uc?export=download&id=<some_numbers>",
-            "main": "main.py"
+            "download": "<https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>">,
+            "main": "python main.py"
         },
         "1.0.1": {
-            "download": "https://drive.google.com/uc?export=download&id=<some_numbers>",
-            "main": "main.py"
+            "download": "<https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>">,
+            "main": "python main.py"
         }
-    }
+    },
+    "update_check_pause": 3600
 }
 ```
 
@@ -29,7 +30,9 @@ You can obtain a direct download link from Google Disk and use it to provide upd
 
 ```json
 {
-    "version_provider": "https://drive.google.com/uc?export=download&id=<some_numbers>",
+    "version_provider": "https://drive.google.com/uc?export=download&id=<REPLACE_WITH_ID>",
+    "update_check_pause": 3600,
+    "last_update_check": 1568563242,
     "downloaded_versions": {
         "1.0.0": {
             "main": "main.py"
@@ -44,25 +47,21 @@ You can obtain a direct download link from Google Disk and use it to provide upd
 
 Visualized example folder structure for cloud:
 
-```
-your_project
-│   server.json
-│   1.0.0.zip
-│   1.0.1.zip
-```
+    your_project
+    │   server.json
+    │   1.0.0.zip
+    │   1.0.1.zip
 
 And locally:
 
-```
-your_project
-│   client.json
-│   vlauncher.py
-└───1.0.0.
-│   │   main.py
-│
-└───1.0.1.
-│   │   main.py
-```
+    your_project
+    │   client.json
+    │   vlauncher.py
+    └───1.0.0.
+    │   │   main.py
+    │
+    └───1.0.1.
+    │   │   main.py
 
 ### Important
 
