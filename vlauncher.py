@@ -1,35 +1,61 @@
+import io
 import json
 import os
-import requests
+import time
 import zipfile
-import io
+
+import requests
 
 
 class Main:
-    def __init__(self, version_provider, downloaded_versions, use_version):
-        self.version_provider = version_provider  # a link to server.json
-        self.use_version = use_version
+    def __init__(self, configuration):
+        self.version_provider = configuration.get("version_provider")
 
-        # {version: {"main": "main.py"}}
-        self.downloaded_versions = downloaded_versions
-        self.downloadable_versions = {}  # {version: download_link}
+        self.update_check_pause = int(configuration.get("update_check_pause"))
+        self.last_update_check = int(configuration.get("last_update_check"))
+        self.use_version = configuration.get("use_version")
+
+        self.downloaded_versions = configuration.get("downloaded_versions")
+        self.downloadable_versions = {}
 
         self.able_to_launch = True
 
     def get_downloadable_versions(self):
-        if "https" not in self.version_provider[:5]:
-            print("Using local version provider")
-            with open(self.version_provider) as f:
-                self.downloadable_versions = json.load(f).get("versions")
+        now = time.time()
+        time_since_check = now - self.last_update_check
+        print("Time since last check:", time_since_check)
+        if time_since_check > self.update_check_pause:
+            print("Wait period has expired!")
+            if "https" not in self.version_provider[:5]:
+                print("Using local version provider")
+                with open(self.version_provider) as f:
+                    server = json.load(f)
+
+                self.downloadable_versions = server.get("versions")
+
+                # Could possibly change on server side
+                self.update_check_pause = server.get("update_check_pause")
+
+                # And remember it
+                self.last_update_check = now
+            else:
+                print("Attempting to use online version provider")
+                try:
+                    response = requests.get(self.version_provider)
+                    print("Server response:", response)
+                    server = response.json()
+                    self.downloadable_versions = server.get(
+                        "versions")
+                    # Could possibly change on server side
+                    self.update_check_pause = server.get("update_check_pause")
+                    self.last_update_check = now
+                except Exception as e:
+                    print("Failed to use online version provider:", e, sep="\n")
+                    self.downloadable_versions = None
+
         else:
-            print("Attempting to use online version provider")
-            try:
-                response = requests.get(self.version_provider)
-                print(response)
-                self.downloadable_versions = response.json().get("versions")
-            except Exception:
-                print("Failed to use online version provider")
-                self.downloadable_versions = None
+            print("Current configuration limits this update check frequency")
+            self.downloadable_versions = None
 
     def download_version(self, version):
         print(version)
@@ -56,7 +82,6 @@ class Main:
             except Exception:
                 print("Failed to download from internet!")
                 self.able_to_launch = False
-                # TODO some fail protocol
 
         # update changes to self
         app_main = self.downloadable_versions.get(version).get("main")
@@ -68,6 +93,7 @@ class Main:
             run = self.downloaded_versions.get(version)
             print("Launching", version, "with", run.get("main"))
             os.chdir(version)
+            print("---RUNNING---")
             os.system(run.get("main"))
         else:
             print("Unable to launch!")
@@ -75,18 +101,35 @@ class Main:
     def update_state(self):
         config = {
             "version_provider": self.version_provider,
+            "update_check_pause": self.update_check_pause,
+            "last_update_check": self.last_update_check,
             "downloaded_versions": self.downloaded_versions,
             "use_version": self.use_version
         }
         with open("client.json", "w") as f:
             f.write(json.dumps(config, indent=4))
 
+    def validate_configuration(self):
+        # Actual versions
+        versions = [v for v in os.listdir() if v in self.downloaded_versions]
+
+        # If what-i-think-i-have minus what-i-actually-have == {},
+        # then it's all good
+        difference = set(self.downloaded_versions) - set(versions)
+        if difference:
+            print("Some versions are no longer present:", difference)
+            for d in difference:
+                self.downloaded_versions.pop(d)
+        else:
+            print("Files present")
+
     def main(self):
         print("Launcher started!")
+        self.validate_configuration()
         self.get_downloadable_versions()
-        print(self.downloadable_versions)
+        # print(self.downloadable_versions)
         if self.use_version == "latest":
-            print("Latest version?")
+            print("Latest version check:")
             if self.downloaded_versions:
                 if self.downloadable_versions:
                     # compare versions, download only if not actual latest
@@ -94,8 +137,8 @@ class Main:
                         sorted(self.downloaded_versions.keys()))[-1]
                     latest_online = list(sorted(
                         self.downloadable_versions.keys()))[-1]
-                    print("LATEST LOCAL", latest_local)
-                    print("LATEST ONLINE", latest_online)
+                    print("Latest local", latest_local)
+                    print("Latest online", latest_online)
                     if latest_local == latest_online:
                         # LOCAL
                         print("You have the latest version")
@@ -107,8 +150,14 @@ class Main:
                         self.launch(latest_online)
 
                 else:
-                    print("Unable to check for newer versions")
-                    # LOCAL
+                    # Check update frequency again (reason for not checking)
+                    now = time.time()
+                    time_since_check = now - self.last_update_check
+                    if time_since_check > self.update_check_pause:
+                        print("Didn't check for latest (couldn't)")
+                        # LOCAL
+                    else:
+                        print("Didn't check for latest (configuration)")
                     latest_local = list(
                         sorted(self.downloaded_versions.keys()))[-1]
 
@@ -171,8 +220,6 @@ if __name__ == "__main__":
     with open("client.json") as f:
         client_config = json.load(f)
 
-    version_provider, downloaded_versions, use_version = client_config.values()
-
-    main = Main(version_provider, downloaded_versions, use_version)
+    main = Main(client_config)
 
     main.main()
